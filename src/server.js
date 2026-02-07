@@ -1,17 +1,15 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const fs = require("fs");
+
 const { salvarMensagem, pegarHistorico } = require("./services/history.service");
 const { analisarImagem } = require("./services/image.service");
-const fs = require("fs");
-const { getStudent, createStudent, updateStudentStats } = require("./services/memory.service");
+const { getStudent, createStudent, updateStudentStats, salvarNome } = require("./services/memory.service");
 const { transcreverAudio } = require("./services/audio.service");
 const { enviarMensagem } = require("./services/whatsapp.service");
 const { baixarAudio } = require("./services/whatsapp.media");
 const { corrigirIngles } = require("./services/ai.service");
-
-const multer = require("multer");
-const upload = multer({ dest: "uploads/" });
 
 const app = express();
 app.use(cors());
@@ -36,7 +34,7 @@ app.get("/teste", async (req, res) => {
 });
 
 //
-// 🔵 WEBHOOK VERIFY META
+// 🔵 VERIFY WEBHOOK META
 //
 app.get("/webhook", (req, res) => {
   const verify_token = "meubot123";
@@ -67,7 +65,7 @@ app.post("/webhook", async (req, res) => {
         const from = msg.from;
         console.log("Mensagem de:", from);
 
-        // 🔎 memória aluno
+        // 🔎 buscar ou criar aluno
         let student = await getStudent(from);
         if (!student) {
           await createStudent(from);
@@ -82,20 +80,46 @@ app.post("/webhook", async (req, res) => {
           const texto = msg.text.body;
           console.log("Texto:", texto);
 
+          // salvar histórico
           await salvarMensagem(from, "user", texto);
 
+          // 🧠 detectar nome
+          if (/meu nome é|my name is|i am/i.test(texto.toLowerCase())) {
+            const nome = texto.split(" ").pop();
+            await salvarNome(from, nome);
+            await enviarMensagem(`Prazer em te conhecer, ${nome} 😄`, from);
+          }
+
+          // histórico conversa
           const historico = await pegarHistorico(from);
 
-          let contexto = "Histórico recente da conversa:\n";
-          historico.forEach(m => {
-            contexto += `${m.role === "user" ? "Aluno" : "Professor"}: ${m.message}\n`;
+          let contexto = `
+Você é Miss Jane, professora particular de inglês da Maria Eugênia.
+
+Fale de forma humana, natural e curta (estilo WhatsApp).
+Seja simpática e próxima.
+Nunca pareça robô.
+
+Se aluno falar português → responda normal.
+Se falar inglês → ajude naturalmente.
+Não corrija sempre.
+Converse.
+
+Nome do aluno: ${student?.name || "não informado"}
+
+Histórico recente:
+`;
+
+          historico.slice(-10).forEach(m => {
+            contexto += `${m.role === "user" ? "Aluno" : "Jane"}: ${m.message}\n`;
           });
 
-          const resposta = await corrigirIngles(contexto + "\nAluno: " + texto);
+          contexto += `\nAluno: ${texto}`;
+
+          const resposta = await corrigirIngles(contexto);
 
           await salvarMensagem(from, "bot", resposta);
           await enviarMensagem(resposta, from);
-          await updateStudentStats(from, 7);
         }
 
         //
@@ -119,22 +143,30 @@ app.post("/webhook", async (req, res) => {
           await salvarMensagem(from, "user", texto);
 
           const historico = await pegarHistorico(from);
-          let contexto = "Histórico recente da conversa:\n";
 
-          historico.forEach(m => {
-            contexto += `${m.role === "user" ? "Aluno" : "Professor"}: ${m.message}\n`;
+          let contexto = `
+Você é Miss Jane, professora de inglês pessoal no WhatsApp.
+Responda de forma natural, curta e humana.
+
+Nome do aluno: ${student?.name || "não informado"}
+
+Histórico:
+`;
+
+          historico.slice(-10).forEach(m => {
+            contexto += `${m.role === "user" ? "Aluno" : "Jane"}: ${m.message}\n`;
           });
 
-          const resposta = await corrigirIngles(contexto + "\nAluno: " + texto);
+          contexto += `\nAluno (áudio): ${texto}`;
+
+          const resposta = await corrigirIngles(contexto);
 
           await salvarMensagem(from, "bot", resposta);
           await enviarMensagem(resposta, from);
           await updateStudentStats(from, 7);
 
-          // 🧹 APAGAR ÁUDIO
-          fs.unlink(caminhoAudio, (err) => {
-            if (err) console.log("Erro ao apagar áudio:", err);
-          });
+          // apagar áudio
+          fs.unlink(caminhoAudio, () => {});
         }
 
         //
@@ -150,12 +182,10 @@ app.post("/webhook", async (req, res) => {
 
           const resposta = await analisarImagem(caminhoImagem);
 
-          await enviarMensagem("📸 Analisando imagem...\n\n" + resposta, from);
+          await enviarMensagem(resposta, from);
 
-          // 🧹 APAGAR IMAGEM
-          fs.unlink(caminhoImagem, (err) => {
-            if (err) console.log("Erro ao apagar imagem:", err);
-          });
+          // apagar imagem
+          fs.unlink(caminhoImagem, () => {});
         }
       }
     }
@@ -166,8 +196,6 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(500);
   }
 });
-
-
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);

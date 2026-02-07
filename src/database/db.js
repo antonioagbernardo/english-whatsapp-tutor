@@ -12,10 +12,13 @@ db.run(`
 CREATE TABLE IF NOT EXISTS students (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   phone TEXT UNIQUE,
+  name TEXT,
+  nickname TEXT,
   level TEXT DEFAULT 'A2',
   total_audios INTEGER DEFAULT 0,
   last_score INTEGER DEFAULT 0,
-  common_errors TEXT DEFAULT ''
+  common_errors TEXT DEFAULT '',
+  last_seen DATETIME
 )
 `);
 
