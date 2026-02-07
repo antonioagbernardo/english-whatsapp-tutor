@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { salvarMensagem, pegarHistorico } = require("./services/history.service");
+const { analisarImagem } = require("./services/image.service");
 
 const { getStudent, createStudent, updateStudentStats } = require("./services/memory.service");
 const { transcreverAudio } = require("./services/audio.service");
@@ -139,6 +140,24 @@ app.post("/webhook", async (req, res) => {
 
           await updateStudentStats(from, 7);
         }
+
+        //
+        // 🖼️ IMAGEM
+        //
+        if (msg.image) {
+          console.log("Imagem recebida");
+
+          const mediaId = msg.image.id;
+
+          const caminhoImagem = await baixarAudio(mediaId); 
+          // (sim, mesma função serve pra imagem)
+
+          console.log("Imagem salva:", caminhoImagem);
+
+          const resposta = await analisarImagem(caminhoImagem);
+
+          await enviarMensagem("📸 Analisando imagem...\n\n" + resposta, from);
+        }               
       }
     }
 
