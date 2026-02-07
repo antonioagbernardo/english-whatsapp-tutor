@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const { salvarMensagem, pegarHistorico } = require("./services/history.service");
 const { analisarImagem } = require("./services/image.service");
-
+const fs = require("fs");
 const { getStudent, createStudent, updateStudentStats } = require("./services/memory.service");
 const { transcreverAudio } = require("./services/audio.service");
 const { enviarMensagem } = require("./services/whatsapp.service");
@@ -67,7 +67,7 @@ app.post("/webhook", async (req, res) => {
         const from = msg.from;
         console.log("Mensagem de:", from);
 
-        // 🔎 memória aluno (perfil)
+        // 🔎 memória aluno
         let student = await getStudent(from);
         if (!student) {
           await createStudent(from);
@@ -82,10 +82,8 @@ app.post("/webhook", async (req, res) => {
           const texto = msg.text.body;
           console.log("Texto:", texto);
 
-          // 💾 salvar msg aluno
           await salvarMensagem(from, "user", texto);
 
-          // 📜 pegar histórico conversa
           const historico = await pegarHistorico(from);
 
           let contexto = "Histórico recente da conversa:\n";
@@ -93,14 +91,10 @@ app.post("/webhook", async (req, res) => {
             contexto += `${m.role === "user" ? "Aluno" : "Professor"}: ${m.message}\n`;
           });
 
-          // 🧠 IA com contexto
           const resposta = await corrigirIngles(contexto + "\nAluno: " + texto);
 
-          // 💾 salvar resposta bot
           await salvarMensagem(from, "bot", resposta);
-
           await enviarMensagem(resposta, from);
-
           await updateStudentStats(from, 7);
         }
 
@@ -111,8 +105,8 @@ app.post("/webhook", async (req, res) => {
           console.log("Áudio recebido");
 
           const mediaId = msg.audio.id;
-
           const caminhoAudio = await baixarAudio(mediaId);
+
           console.log("Áudio salvo:", caminhoAudio);
 
           const texto = await transcreverAudio({
@@ -122,12 +116,11 @@ app.post("/webhook", async (req, res) => {
 
           console.log("Transcrição:", texto);
 
-          // 💾 salvar msg aluno
           await salvarMensagem(from, "user", texto);
 
           const historico = await pegarHistorico(from);
-
           let contexto = "Histórico recente da conversa:\n";
+
           historico.forEach(m => {
             contexto += `${m.role === "user" ? "Aluno" : "Professor"}: ${m.message}\n`;
           });
@@ -135,10 +128,13 @@ app.post("/webhook", async (req, res) => {
           const resposta = await corrigirIngles(contexto + "\nAluno: " + texto);
 
           await salvarMensagem(from, "bot", resposta);
-
           await enviarMensagem(resposta, from);
-
           await updateStudentStats(from, 7);
+
+          // 🧹 APAGAR ÁUDIO
+          fs.unlink(caminhoAudio, (err) => {
+            if (err) console.log("Erro ao apagar áudio:", err);
+          });
         }
 
         //
@@ -148,16 +144,19 @@ app.post("/webhook", async (req, res) => {
           console.log("Imagem recebida");
 
           const mediaId = msg.image.id;
-
-          const caminhoImagem = await baixarAudio(mediaId); 
-          // (sim, mesma função serve pra imagem)
+          const caminhoImagem = await baixarAudio(mediaId);
 
           console.log("Imagem salva:", caminhoImagem);
 
           const resposta = await analisarImagem(caminhoImagem);
 
           await enviarMensagem("📸 Analisando imagem...\n\n" + resposta, from);
-        }               
+
+          // 🧹 APAGAR IMAGEM
+          fs.unlink(caminhoImagem, (err) => {
+            if (err) console.log("Erro ao apagar imagem:", err);
+          });
+        }
       }
     }
 
@@ -167,6 +166,8 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(500);
   }
 });
+
+
 
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
