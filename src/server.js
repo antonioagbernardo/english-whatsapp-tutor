@@ -3,6 +3,12 @@ const express = require('express');
 const cors = require('cors');
 const fs = require("fs");
 
+// 🔵 criar pasta uploads automaticamente (Railway precisa)
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+  console.log("📁 Pasta uploads criada");
+}
+
 const { salvarMensagem, pegarHistorico } = require("./services/history.service");
 const { analisarImagem } = require("./services/image.service");
 const { getStudent, createStudent, updateStudentStats, salvarNome } = require("./services/memory.service");
@@ -66,7 +72,7 @@ app.post("/webhook", async (req, res) => {
         const from = msg.from;
         console.log("Mensagem de:", from);
 
-        // 🔎 buscar ou criar aluno
+        // 🔎 aluno
         let student = await getStudent(from);
         if (!student) {
           await createStudent(from);
@@ -94,19 +100,12 @@ app.post("/webhook", async (req, res) => {
 
           let contexto = `
 Você é Miss Jane, professora particular de inglês da Maria Eugênia.
-
-Fale de forma humana, natural e curta (estilo WhatsApp).
-Seja simpática e próxima.
+Fale humano, natural e curto (WhatsApp).
 Nunca pareça robô.
-
-Se aluno falar português → responda normal.
-Se falar inglês → ajude naturalmente.
-Não corrija sempre.
-Converse.
 
 Nome do aluno: ${student?.name || "não informado"}
 
-Histórico recente:
+Histórico:
 `;
 
           historico.slice(-10).forEach(m => {
@@ -144,8 +143,8 @@ Histórico recente:
           const historico = await pegarHistorico(from);
 
           let contexto = `
-Você é Miss Jane, professora de inglês pessoal no WhatsApp.
-Responda de forma natural, curta e humana.
+Você é Miss Jane, professora de inglês pessoal.
+Fale natural e humano.
 
 Nome do aluno: ${student?.name || "não informado"}
 
@@ -162,7 +161,7 @@ Histórico:
 
           await salvarMensagem(from, "bot", resposta);
 
-          // 🎙️ gerar voz da resposta
+          // 🎙️ gerar voz
           const caminhoVoz = await gerarAudio(resposta);
 
           // enviar áudio
@@ -170,7 +169,7 @@ Histórico:
 
           await updateStudentStats(from, 7);
 
-          // limpar arquivos
+          // 🧹 limpar
           fs.unlink(caminhoAudio, () => {});
           fs.unlink(caminhoVoz, () => {});
         }
