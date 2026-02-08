@@ -21,7 +21,7 @@ async function gerarAudio(texto) {
 
   // 🔊 enviar apenas a fala real
   const mp3 = await openai.audio.speech.create({
-    model: "gpt-4o-realtime-preview",
+    model: "gpt-4o-mini-tts",
     voice: "fable", 
     input: textoLimpo,
   });
