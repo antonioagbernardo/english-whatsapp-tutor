@@ -1,4 +1,6 @@
 const axios = require("axios");
+const fs = require("fs");
+const FormData = require("form-data");
 require("dotenv").config();
 
 //
@@ -14,25 +16,29 @@ function formatarParaWhatsApp(texto) {
     // __negrito__ -> *negrito*
     .replace(/__(.*?)__/g, "*$1*")
 
-    // remove crases de código
+    // remove blocos de código
     .replace(/```/g, "")
     .replace(/`/g, "")
 
-    // listas markdown → bullets WhatsApp
+    // listas markdown → bullets
     .replace(/^- /gm, "• ")
     .replace(/^\* /gm, "• ")
 
-    // remove ### títulos
+    // remove títulos ### 
     .replace(/^#+\s?/gm, "")
 
-    // evita muitos \n
-    .replace(/\n{3,}/g, "\n\n");
+    // evita muitos espaços
+    .replace(/\n{3,}/g, "\n\n")
+
+    .trim();
 }
 
+//
+// 📩 enviar TEXTO
+//
 async function enviarMensagem(texto, numeroDestino) {
   const url = `https://graph.facebook.com/v18.0/${process.env.PHONE_NUMBER_ID}/messages`;
 
-  // 🔵 formata antes de enviar
   const textoFormatado = formatarParaWhatsApp(texto);
 
   await axios.post(
@@ -52,4 +58,48 @@ async function enviarMensagem(texto, numeroDestino) {
   );
 }
 
-module.exports = { enviarMensagem };
+//
+// 🎧 enviar AUDIO
+//
+async function enviarAudio(caminho, numeroDestino) {
+  try {
+    const uploadUrl = `https://graph.facebook.com/v18.0/${process.env.PHONE_NUMBER_ID}/media`;
+
+    const form = new FormData();
+    form.append("file", fs.createReadStream(caminho));
+    form.append("type", "audio/mpeg");
+    form.append("messaging_product", "whatsapp");
+
+    // upload mídia
+    const upload = await axios.post(uploadUrl, form, {
+      headers: {
+        Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+        ...form.getHeaders(),
+      },
+    });
+
+    const mediaId = upload.data.id;
+
+    // enviar áudio
+    await axios.post(
+      `https://graph.facebook.com/v18.0/${process.env.PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: numeroDestino,
+        type: "audio",
+        audio: { id: mediaId },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+  } catch (err) {
+    console.error("Erro ao enviar áudio:", err.response?.data || err);
+  }
+}
+
+module.exports = { enviarMensagem, enviarAudio };

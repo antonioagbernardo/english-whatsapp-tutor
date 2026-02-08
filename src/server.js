@@ -7,7 +7,8 @@ const { salvarMensagem, pegarHistorico } = require("./services/history.service")
 const { analisarImagem } = require("./services/image.service");
 const { getStudent, createStudent, updateStudentStats, salvarNome } = require("./services/memory.service");
 const { transcreverAudio } = require("./services/audio.service");
-const { enviarMensagem } = require("./services/whatsapp.service");
+const { enviarMensagem, enviarAudio } = require("./services/whatsapp.service");
+const { gerarAudio } = require("./services/voice.service");
 const { baixarAudio } = require("./services/whatsapp.media");
 const { corrigirIngles } = require("./services/ai.service");
 
@@ -80,17 +81,15 @@ app.post("/webhook", async (req, res) => {
           const texto = msg.text.body;
           console.log("Texto:", texto);
 
-          // salvar histórico
           await salvarMensagem(from, "user", texto);
 
-          // 🧠 detectar nome
+          // detectar nome
           if (/meu nome é|my name is|i am/i.test(texto.toLowerCase())) {
             const nome = texto.split(" ").pop();
             await salvarNome(from, nome);
             await enviarMensagem(`Prazer em te conhecer, ${nome} 😄`, from);
           }
 
-          // histórico conversa
           const historico = await pegarHistorico(from);
 
           let contexto = `
@@ -162,11 +161,18 @@ Histórico:
           const resposta = await corrigirIngles(contexto);
 
           await salvarMensagem(from, "bot", resposta);
-          await enviarMensagem(resposta, from);
+
+          // 🎙️ gerar voz da resposta
+          const caminhoVoz = await gerarAudio(resposta);
+
+          // enviar áudio
+          await enviarAudio(caminhoVoz, from);
+
           await updateStudentStats(from, 7);
 
-          // apagar áudio
+          // limpar arquivos
           fs.unlink(caminhoAudio, () => {});
+          fs.unlink(caminhoVoz, () => {});
         }
 
         //
@@ -184,7 +190,6 @@ Histórico:
 
           await enviarMensagem(resposta, from);
 
-          // apagar imagem
           fs.unlink(caminhoImagem, () => {});
         }
       }
