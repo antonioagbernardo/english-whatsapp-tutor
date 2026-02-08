@@ -11,13 +11,13 @@ async function gerarAudio(texto) {
 
   // 🧹 limpar markdown que fica feio em voz
   const textoLimpo = texto
-    .replace(/\*\*/g, "")
-    .replace(/\*/g, "")
-    .replace(/#/g, "")
-    .replace(/`/g, "")
-    .replace(/•/g, "-")
-    .replace(/\n{2,}/g, "\n")
-    .trim();
+    // .replace(/\*\*/g, "")
+    // .replace(/\*/g, "")
+    // .replace(/#/g, "")
+    // .replace(/`/g, "")
+    // .replace(/•/g, "-")
+    // .replace(/\n{2,}/g, "\n")
+    // .trim();
 
   // 🔊 enviar apenas a fala real
   const mp3 = await openai.audio.speech.create({
