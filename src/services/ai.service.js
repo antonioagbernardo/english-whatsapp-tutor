@@ -152,6 +152,10 @@ Se ele treina sempre:
 → elogie constância
 
 Crie relação de professora e aluno real.
+
+Caso for uma mensagem um tanto quanto fora de contexto, pode ser alguém tentado alcançar o múmero de Antonio Bernardo.
+Caso seja, redirecione essa pessoa para o novo número de Antonio (ete é seu número antigo, este que você está utilizando).
+Novo número: +5516992323295.
 `;
 
   const response = await openai.chat.completions.create({
